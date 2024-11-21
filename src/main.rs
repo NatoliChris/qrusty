@@ -1,6 +1,6 @@
 use clap::{Arg, ArgAction, Command};
 use device_query::{DeviceQuery, DeviceState};
-use image::{imageops, DynamicImage, RgbImage, RgbaImage};
+use image::{imageops, DynamicImage, RgbaImage};
 use xcap::Monitor;
 
 #[derive(Clone, Debug)]
@@ -15,14 +15,6 @@ struct ScreenBox {
 struct Coord {
     x: i32,
     y: i32,
-}
-
-fn normalize_name(file_name: &str) -> String {
-    file_name
-        .replace("|", "")
-        .replace("\\", "")
-        .replace(":", "")
-        .replace("/", "")
 }
 
 #[derive(Clone, Debug)]
@@ -56,10 +48,10 @@ impl BoundingBox {
     }
 
     pub fn intersects(&self, other: &BoundingBox) -> bool {
-        return !(self.top_right.x < other.bottom_left.x
+        !(self.top_right.x < other.bottom_left.x
             || self.bottom_left.x > other.top_right.x
             || self.top_right.y > other.bottom_left.y
-            || self.bottom_left.y < other.top_right.y);
+            || self.bottom_left.y < other.top_right.y)
     }
 }
 
@@ -96,12 +88,10 @@ fn get_region_from_user() -> Result<ScreenBox, ()> {
         }
 
         // if the button is now released
-        if !m_state.button_pressed[1] {
-            if is_selecting && init_selection {
-                sc_box.end_x = coords.0;
-                sc_box.end_y = coords.1;
-                is_selecting = false;
-            }
+        if !m_state.button_pressed[1] && is_selecting && init_selection {
+            sc_box.end_x = coords.0;
+            sc_box.end_y = coords.1;
+            is_selecting = false;
         }
 
         if !is_selecting && init_selection {
@@ -110,7 +100,7 @@ fn get_region_from_user() -> Result<ScreenBox, ()> {
         }
     }
 
-    return Ok(sc_box);
+    Ok(sc_box)
 }
 
 // Find what monitor the selection was in.
