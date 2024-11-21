@@ -1,6 +1,6 @@
 use clap::{Arg, ArgAction, Command};
 use device_query::{DeviceQuery, DeviceState};
-use image::imageops;
+use image::{imageops, DynamicImage, RgbImage, RgbaImage};
 use xcap::Monitor;
 
 #[derive(Clone, Debug)]
@@ -134,7 +134,7 @@ fn find_monitor_box(selection_box: &BoundingBox) -> Result<Monitor, ()> {
     }
 }
 
-fn get_screen_shot(selection: &ScreenBox) -> Result<(), ()> {
+fn get_screen_shot(selection: &ScreenBox) -> Result<RgbaImage, ()> {
     let selection_box = BoundingBox::new_from_coords(
         selection.start_x,
         selection.start_y,
@@ -160,16 +160,33 @@ fn get_screen_shot(selection: &ScreenBox) -> Result<(), ()> {
                 &mut ss,
                 relative_box.top_left.x as u32,
                 relative_box.top_left.y as u32,
-                (relative_box.top_right.x - relative_box.top_left.y) as u32,
+                (relative_box.top_right.x - relative_box.top_left.x) as u32,
                 (relative_box.bottom_left.y - relative_box.top_left.y) as u32,
             );
+
+            _ = sub.to_image().save("test.png");
+
             // Do something
-            sub.to_image()
-                .save(format!("test_{}.png", normalize_name(monitor.name())))
-                .unwrap();
+            return Ok(sub.to_image());
         }
     }
     Err(())
+}
+
+fn find_qr(im: &RgbaImage) {
+    let gray = DynamicImage::ImageRgba8(im.clone()).into_luma8();
+
+    let mut dec = rqrr::PreparedImage::prepare(gray);
+    let grids = dec.detect_grids();
+
+    println!(
+        "{:?}",
+        grids
+            .iter()
+            .map(|x| x.decode().unwrap())
+            .map(|x| x.1)
+            .collect::<Vec<String>>()
+    );
 }
 
 fn main() {
@@ -188,7 +205,9 @@ fn main() {
 
     if let Ok(Some(true)) = arg_matches.try_get_one::<bool>("select") {
         if let Ok(reg) = get_region_from_user() {
-            println!("{:?}", get_screen_shot(&reg));
+            if let Ok(ss) = get_screen_shot(&reg) {
+                find_qr(&ss)
+            };
         }
     } else {
         println!("Capturing entire screen");
