@@ -1,68 +1,27 @@
+use bounding_box::BoundingBox;
 use clap::{Arg, ArgAction, Command};
 use device_query::{DeviceQuery, DeviceState};
 use image::{imageops, DynamicImage, RgbaImage};
 use xcap::Monitor;
 
+mod bounding_box;
+
 #[derive(Clone, Debug)]
-struct ScreenBox {
+struct MouseBox {
     start_x: i32,
     end_x: i32,
     start_y: i32,
     end_y: i32,
 }
 
-#[derive(Clone, Debug)]
-struct Coord {
-    x: i32,
-    y: i32,
-}
-
-#[derive(Clone, Debug)]
-struct BoundingBox {
-    top_left: Coord,
-    top_right: Coord,
-    bottom_left: Coord,
-    bottom_right: Coord,
-}
-
-impl BoundingBox {
-    pub fn new(x: i32, y: i32, width: i32, height: i32) -> Self {
-        Self {
-            top_left: Coord { x, y },
-            top_right: Coord { x: x + width, y },
-            bottom_left: Coord { x, y: y + height },
-            bottom_right: Coord {
-                x: x + width,
-                y: y + height,
-            },
-        }
-    }
-
-    pub fn new_from_coords(x: i32, y: i32, x_2: i32, y_2: i32) -> Self {
-        Self {
-            top_left: Coord { x, y },
-            top_right: Coord { x: x_2, y },
-            bottom_left: Coord { x, y: y_2 },
-            bottom_right: Coord { x: x_2, y: y_2 },
-        }
-    }
-
-    pub fn intersects(&self, other: &BoundingBox) -> bool {
-        !(self.top_right.x < other.bottom_left.x
-            || self.bottom_left.x > other.top_right.x
-            || self.top_right.y > other.bottom_left.y
-            || self.bottom_left.y < other.top_right.y)
-    }
-}
-
 // Get the user to select a region on the screen
-fn get_region_from_user() -> Result<ScreenBox, ()> {
+fn get_region_from_user() -> Result<MouseBox, ()> {
     // variables for tracking
     let mut init_selection = false;
     let mut is_selecting = false;
 
     // the screen box to be created
-    let mut sc_box = ScreenBox {
+    let mut sc_box = MouseBox {
         start_x: 0,
         start_y: 0,
         end_x: 0,
@@ -104,7 +63,7 @@ fn get_region_from_user() -> Result<ScreenBox, ()> {
 }
 
 // Find what monitor the selection was in.
-fn find_monitor_box(selection_box: &BoundingBox) -> Result<Monitor, ()> {
+fn find_monitor_box(selection_bound: &BoundingBox) -> Result<Monitor, ()> {
     // TODO: find a way to morph multiple monitors for screenshots over multiple screens!
 
     if let Ok(m_list) = Monitor::all() {
@@ -114,7 +73,7 @@ fn find_monitor_box(selection_box: &BoundingBox) -> Result<Monitor, ()> {
                 BoundingBox::new(mon.x(), mon.y(), mon.width() as i32, mon.height() as i32);
             // Checking for bounding box overlaps
             // NOTE: screen Y position increases as you move down in xrandr?
-            if monitor_box.intersects(selection_box) {
+            if monitor_box.intersects(selection_bound) {
                 return Ok(mon);
             }
         }
@@ -124,28 +83,30 @@ fn find_monitor_box(selection_box: &BoundingBox) -> Result<Monitor, ()> {
     }
 }
 
-fn get_screen_shot(selection: &ScreenBox) -> Result<RgbaImage, ()> {
-    let selection_box = BoundingBox::new_from_coords(
+fn get_screen_shot(selection: &MouseBox) -> Result<RgbaImage, ()> {
+    let selection_bound = BoundingBox::new_from_coords(
         selection.start_x,
         selection.start_y,
         selection.end_x,
         selection.end_y,
     );
 
-    let maybe_monitor = find_monitor_box(&selection_box);
+    let maybe_monitor = find_monitor_box(&selection_bound);
     if let Ok(monitor) = maybe_monitor {
+        // DEBUG
         println!("{:?}", monitor.name());
         let maybe_ss = monitor.capture_image();
 
         if let Ok(mut ss) = maybe_ss {
-            // get the local coordinates of the bounding box
+            // Create a bounding box relative to the screenshot
             let relative_box = BoundingBox::new_from_coords(
-                selection_box.top_left.x - monitor.x(),
-                selection_box.top_left.y - monitor.y(),
-                selection_box.bottom_right.x - monitor.x(),
-                selection_box.bottom_right.y - monitor.y(),
+                selection_bound.top_left.x - monitor.x(),
+                selection_bound.top_left.y - monitor.y(),
+                selection_bound.bottom_right.x - monitor.x(),
+                selection_bound.bottom_right.y - monitor.y(),
             );
 
+            // Crop the picture to the selection
             let sub = imageops::crop(
                 &mut ss,
                 relative_box.top_left.x as u32,
@@ -154,9 +115,7 @@ fn get_screen_shot(selection: &ScreenBox) -> Result<RgbaImage, ()> {
                 (relative_box.bottom_left.y - relative_box.top_left.y) as u32,
             );
 
-            _ = sub.to_image().save("test.png");
-
-            // Do something
+            // Return the array
             return Ok(sub.to_image());
         }
     }
@@ -169,6 +128,7 @@ fn find_qr(im: &RgbaImage) {
     let mut dec = rqrr::PreparedImage::prepare(gray);
     let grids = dec.detect_grids();
 
+    // Debug print to string for now
     println!(
         "{:?}",
         grids
