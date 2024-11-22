@@ -51,7 +51,7 @@ mod tests {
     // ////////////////////////////////////////
 
     #[test]
-    fn left_right_no_intersect() {
+    fn no_intersect_left() {
         let box_one = BoundingBox::new(0, 0, 5, 5);
         let box_two = BoundingBox::new(10, 0, 10, 10);
 
@@ -60,7 +60,7 @@ mod tests {
     }
 
     #[test]
-    fn top_bottom_no_intersect() {
+    fn no_intersect_top() {
         let box_one = BoundingBox::new(0, 0, 5, 5);
         let box_two = BoundingBox::new(0, 6, 5, 5);
 
@@ -69,7 +69,7 @@ mod tests {
     }
 
     #[test]
-    fn test_neg_coords() {
+    fn no_intersect_neg_coords() {
         let box_one = BoundingBox::new(0, 0, 5, 5);
         let box_two = BoundingBox::new(-6, -6, 5, 5);
 
@@ -78,7 +78,7 @@ mod tests {
     }
 
     #[test]
-    fn test_right_next_to_each_other() {
+    fn no_intersect_shared_boundary() {
         let box_one = BoundingBox::new(0, 0, 5, 5);
         let box_two = BoundingBox::new(5, 0, 5, 5);
         let box_three = BoundingBox::new(0, 5, 5, 5);
@@ -87,5 +87,82 @@ mod tests {
         assert!(!box_two.intersects(&box_one), "Boxes do not intersect");
         assert!(!box_one.intersects(&box_three), "Boxes do not intersect");
         assert!(!box_two.intersects(&box_three), "Boxes do not intersect");
+    }
+
+    // ////////////////////////////////////////
+    // Slight overlap
+    // ////////////////////////////////////////
+
+    #[test]
+    fn intersect_left() {
+        let box_one = BoundingBox::new(0, 0, 5, 5);
+        let box_two = BoundingBox::new(4, 0, 6, 10);
+
+        assert!(
+            box_one.intersects(&box_two),
+            "Boxes intersect, should be true"
+        );
+        assert!(
+            box_two.intersects(&box_one),
+            "Boxes intersect, should be true"
+        );
+    }
+
+    #[test]
+    fn intersect_top() {
+        let box_one = BoundingBox::new(0, 0, 5, 5);
+        let box_two = BoundingBox::new(0, 4, 6, 10);
+
+        assert!(
+            box_one.intersects(&box_two),
+            "Boxes intersect, should be true"
+        );
+        assert!(
+            box_two.intersects(&box_one),
+            "Boxes intersect, should be true"
+        );
+    }
+
+    #[test]
+    fn intersect_contained() {
+        // Illustration
+        //   ______
+        //  |  _   |
+        //  | |_|  |
+        //  |______|
+
+        let box_one = BoundingBox::new(0, 0, 10, 10);
+        let box_inner = BoundingBox::new(2, 2, 3, 3);
+
+        assert!(
+            box_one.intersects(&box_inner),
+            "Box is contained, should be true"
+        );
+        assert!(
+            box_inner.intersects(&box_one),
+            "Box is contained, should be true"
+        );
+    }
+
+    #[test]
+    fn intersect_top_right() {
+        // Illustration
+        //        ____
+        //   ____|_   |
+        //  |    |_|__|
+        //  |      |
+        //  |______|
+
+        let box_one = BoundingBox::new(0, 0, 5, 5);
+        let box_two = BoundingBox::new(4, 4, 3, 3);
+
+        assert!(
+            box_one.intersects(&box_two),
+            "Boxes intersect, should be true"
+        );
+        assert!(
+            box_two.intersects(&box_one),
+            "Boxes intersect, should be true"
+        );
     }
 }
