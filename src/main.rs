@@ -1,7 +1,10 @@
+use std::fs::Metadata;
+
 use bounding_box::BoundingBox;
 use clap::{Arg, ArgAction, Command};
 use device_query::{DeviceQuery, DeviceState};
-use image::{imageops, DynamicImage, Luma, RgbaImage};
+use image::{imageops, DynamicImage, RgbaImage};
+use rqrr::MetaData;
 use xcap::Monitor;
 
 mod bounding_box;
@@ -102,8 +105,6 @@ fn get_screen_shot(selection: &MouseBox) -> Result<RgbaImage, ()> {
 
     let maybe_monitor = find_monitor_box(&selection_bound);
     if let Ok(monitor) = maybe_monitor {
-        // DEBUG
-        println!("{:?}", monitor.name());
         let maybe_ss = monitor.capture_image();
 
         if let Ok(mut ss) = maybe_ss {
@@ -138,13 +139,7 @@ fn screenshot_all_monitors() -> Result<Vec<RgbaImage>, ()> {
         monitors
             .into_iter()
             .map(|m| m.capture_image())
-            .map(|r| {
-                if let Ok(img) = r {
-                    return Ok(img);
-                } else {
-                    return Err(());
-                }
-            })
+            .map(|r| if let Ok(img) = r { Ok(img) } else { Err(()) })
             .collect::<Result<Vec<RgbaImage>, ()>>()
     } else {
         Err(())
@@ -153,36 +148,28 @@ fn screenshot_all_monitors() -> Result<Vec<RgbaImage>, ()> {
 
 fn find_all_qrs(imgs: Vec<RgbaImage>) -> Vec<String> {
     imgs.into_iter()
-        .map(|i| {
+        .flat_map(|i| {
             let luma_img = DynamicImage::ImageRgba8(i).into_luma8();
             let mut dec = rqrr::PreparedImage::prepare(luma_img);
 
             let grids = dec.detect_grids();
             grids
                 .iter()
-                .map(|x| x.decode().unwrap())
+                .map(|x| {
+                    x.decode().unwrap_or((
+                        // Test dummy data
+                        MetaData {
+                            version: rqrr::Version(1),
+                            ecc_level: 1,
+                            mask: 1,
+                        },
+                        String::from(""),
+                    ))
+                })
                 .map(|x| x.1)
                 .collect::<Vec<String>>()
         })
-        .flatten()
         .collect::<Vec<String>>()
-}
-
-fn find_qr(im: &RgbaImage) {
-    let gray = DynamicImage::ImageRgba8(im.clone()).into_luma8();
-
-    let mut dec = rqrr::PreparedImage::prepare(gray);
-    let grids = dec.detect_grids();
-
-    // Debug print to string for now
-    println!(
-        "{:?}",
-        grids
-            .iter()
-            .map(|x| x.decode().unwrap())
-            .map(|x| x.1)
-            .collect::<Vec<String>>()
-    );
 }
 
 fn main() {
