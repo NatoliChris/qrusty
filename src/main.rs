@@ -1,7 +1,7 @@
 use bounding_box::BoundingBox;
 use clap::{Arg, ArgAction, Command};
 use device_query::{DeviceQuery, DeviceState};
-use image::{imageops, DynamicImage, RgbaImage};
+use image::{imageops, DynamicImage, Luma, RgbaImage};
 use xcap::Monitor;
 
 mod bounding_box;
@@ -83,6 +83,15 @@ fn find_monitor_box(selection_bound: &BoundingBox) -> Result<Monitor, ()> {
     }
 }
 
+fn list_all_monitors() -> Result<Vec<Monitor>, ()> {
+    if let Ok(m_list) = Monitor::all() {
+        return Ok(m_list);
+    }
+
+    // Could not return any monitors
+    Err(())
+}
+
 fn get_screen_shot(selection: &MouseBox) -> Result<RgbaImage, ()> {
     let selection_bound = BoundingBox::new_from_coords(
         selection.start_x,
@@ -122,6 +131,43 @@ fn get_screen_shot(selection: &MouseBox) -> Result<RgbaImage, ()> {
     Err(())
 }
 
+fn screenshot_all_monitors() -> Result<Vec<RgbaImage>, ()> {
+    let maybe_monitors = list_all_monitors();
+
+    if let Ok(monitors) = maybe_monitors {
+        monitors
+            .into_iter()
+            .map(|m| m.capture_image())
+            .map(|r| {
+                if let Ok(img) = r {
+                    return Ok(img);
+                } else {
+                    return Err(());
+                }
+            })
+            .collect::<Result<Vec<RgbaImage>, ()>>()
+    } else {
+        Err(())
+    }
+}
+
+fn find_all_qrs(imgs: Vec<RgbaImage>) -> Vec<String> {
+    imgs.into_iter()
+        .map(|i| {
+            let luma_img = DynamicImage::ImageRgba8(i).into_luma8();
+            let mut dec = rqrr::PreparedImage::prepare(luma_img);
+
+            let grids = dec.detect_grids();
+            grids
+                .iter()
+                .map(|x| x.decode().unwrap())
+                .map(|x| x.1)
+                .collect::<Vec<String>>()
+        })
+        .flatten()
+        .collect::<Vec<String>>()
+}
+
 fn find_qr(im: &RgbaImage) {
     let gray = DynamicImage::ImageRgba8(im.clone()).into_luma8();
 
@@ -156,10 +202,14 @@ fn main() {
     if let Ok(Some(true)) = arg_matches.try_get_one::<bool>("select") {
         if let Ok(reg) = get_region_from_user() {
             if let Ok(ss) = get_screen_shot(&reg) {
-                find_qr(&ss)
+                // find_qr(&ss)
+                println!("{:?}", find_all_qrs(vec![ss]));
             };
         }
     } else {
+        if let Ok(images) = screenshot_all_monitors() {
+            println!("{:?}", find_all_qrs(images));
+        }
         println!("Capturing entire screen");
     }
 }
