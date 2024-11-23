@@ -219,15 +219,15 @@ fn send_to_clipboard(qrs: Vec<String>) {
     let maybe_ctx = ClipboardContext::new();
 
     if let Ok(mut ctx) = maybe_ctx {
-        println!("setting: {:?}", qrs);
-        // todo: fix
         if let Err(e) = ctx.set_contents(qrs.join(" ").to_string().to_owned()) {
             println!("Failed to set clipboard");
             return;
         }
         let _ = ctx.get_contents();
 
-        // TODO: look at persistence for the clipboard
+        // TODO: look at persistence for the clipboard -- linux only keeps
+        // while the fork of the process is alive;
+        // https://github.com/aweinstock314/rust-clipboard/issues/28
         sleep(Duration::from_secs(5));
     } else {
         eprintln!("Failed to get clipboard context, falling back to print");
