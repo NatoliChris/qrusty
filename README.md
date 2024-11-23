@@ -28,5 +28,6 @@ Uses a few libraries to make things easier:
 - [ ] intercept mouse click / drag when users make selection
 - [ ] make it possible to screenshot over multiple monitors with drawn box
 - [ ] Improve compatibility and decoding of more QRs/binary - library only does very few variations of QRs
-- [ ] Copy the QR code directly into clipboard.
+- [x] Copy the QR code directly into clipboard.
+- [ ] Clipboard persistence across OSes
 
