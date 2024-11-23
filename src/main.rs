@@ -11,10 +11,14 @@
 //! * `-c` : copy the identified QR code into clipboard (note, multiple QRs
 //!          will lead to a space-delimited array copied)
 
+use std::{thread::sleep, time::Duration};
+
 use bounding_box::BoundingBox;
 use clap::{Arg, ArgAction, Command};
+use copypasta::{ClipboardContext, ClipboardProvider};
 use device_query::{DeviceQuery, DeviceState};
 use image::{imageops, DynamicImage, RgbaImage};
+use notify_rust::Notification;
 use rqrr::MetaData;
 use xcap::Monitor;
 
@@ -210,6 +214,27 @@ fn find_all_qrs(imgs: Vec<RgbaImage>) -> Vec<String> {
         .collect::<Vec<String>>()
 }
 
+// Send it to the clipboard context
+fn send_to_clipboard(qrs: Vec<String>) {
+    let maybe_ctx = ClipboardContext::new();
+
+    if let Ok(mut ctx) = maybe_ctx {
+        println!("setting: {:?}", qrs);
+        // todo: fix
+        if let Err(e) = ctx.set_contents(format!("{}", qrs.join(" ")).to_owned()) {
+            println!("Failed to set clipboard");
+            return;
+        }
+        let _ = ctx.get_contents();
+
+        // TODO: look at persistence for the clipboard
+        sleep(Duration::from_secs(5));
+    } else {
+        eprintln!("Failed to get clipboard context, falling back to print");
+        println!("{:?}", qrs.join(" "));
+    }
+}
+
 /// Main QRusty
 fn main() {
     // Set up the command line arguments
@@ -223,16 +248,41 @@ fn main() {
                 .action(ArgAction::SetTrue)
                 .help("Capture part of the display"),
         )
+        .arg(
+            Arg::new("clipboard")
+                .short('c')
+                .long("clip")
+                .action(ArgAction::SetTrue)
+                .help("Copy output directly to the clipboard"),
+        )
         .get_matches();
+
+    let mut found_qrs: Vec<String> = Vec::new();
 
     // Call the appropriate function to capture the area or the full screen.
     if let Ok(Some(true)) = arg_matches.try_get_one::<bool>("select") {
         if let Ok(reg) = get_region_from_user() {
             if let Ok(ss) = get_screen_shot(&reg) {
-                println!("{:?}", find_all_qrs(vec![ss]));
+                found_qrs = find_all_qrs(vec![ss]);
             };
         }
     } else if let Ok(images) = screenshot_all_monitors() {
-        println!("{:?}", find_all_qrs(images));
+        found_qrs = find_all_qrs(images);
+    }
+
+    if let Err(_) = Notification::new()
+        .summary("QRusty")
+        .body(format!("QR: {}", found_qrs.join(" ")).as_str())
+        .show()
+    {
+        eprintln!("Failed to send notification");
+    }
+
+    // Now send to clipboard if the clipboard
+    if let Ok(Some(true)) = arg_matches.try_get_one::<bool>("clipboard") {
+        send_to_clipboard(found_qrs);
+    } else {
+        // Print it out
+        println!("{:?}", found_qrs);
     }
 }
