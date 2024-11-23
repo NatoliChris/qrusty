@@ -221,7 +221,7 @@ fn send_to_clipboard(qrs: Vec<String>) {
     if let Ok(mut ctx) = maybe_ctx {
         println!("setting: {:?}", qrs);
         // todo: fix
-        if let Err(e) = ctx.set_contents(format!("{}", qrs.join(" ")).to_owned()) {
+        if let Err(e) = ctx.set_contents(qrs.join(" ").to_string().to_owned()) {
             println!("Failed to set clipboard");
             return;
         }
